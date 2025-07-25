@@ -1,126 +1,204 @@
-🚀 Chains no LangChain
-📌 O que são Chains?
-Chains são fluxos de trabalho que conectam um ou mais componentes do LangChain — como LLMs (modelos de linguagem), prompts, memória, ferramentas etc. — para executar tarefas mais elaboradas do que uma simples chamada de modelo.
+# Chains no LangChain
 
-🧱 Principais Tipos de Chains
-1. 🔗 LLMChain — Execução básica com prompt
-Utiliza um prompt e um modelo de linguagem (LLM). Ideal para tarefas simples como perguntas e respostas, reformulações, análises, etc.
+No LangChain, *chains* são fluxos de trabalho que conectam diferentes componentes, como modelos de linguagem (LLMs), agentes, ferramentas e outros recursos, para realizar tarefas complexas. A seguir, exploraremos os principais tipos de *chains*, com exemplos e explicações detalhadas.
 
-bach
-Copiar
-Editar
+---
+
+## 1. Simple Chain
+
+O *simple chain* é o tipo básico de cadeia, onde uma entrada é passada diretamente para um modelo de linguagem ou outra ferramenta, e o resultado é retornado.
+
+### Exemplo:
+
+```python
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from langchain.llms import OpenAI
 
-# Define o template do prompt com uma variável chamada 'pais'
-prompt = PromptTemplate.from_template("Qual é a capital de {pais}?")
+# Criação do modelo de linguagem
+llm = OpenAI(temperature=0.7)
 
-# Cria a chain passando o modelo e o prompt
-chain = LLMChain(llm=chat, prompt=prompt)
+# Definição do prompt
+prompt = PromptTemplate(input_variables=["name"], template="Qual é o seu nome, {name}?")
 
-# Executa a chain com a variável preenchida
-resposta = chain.run("Brasil")
-print(resposta)
-2. 🧠 ConversationChain — Memória de conversas
-Permite interações com histórico, lembrando o que foi dito anteriormente. Ideal para chatbots ou assistentes.
+# Criação do LLMChain
+chain = LLMChain(llm=llm, prompt=prompt)
 
-bach
-Copiar
-Editar
-from langchain.chains import ConversationChain
+# Execução da cadeia com entrada
+output = chain.run(name="Cícero")
+print(output)  # Saída: Qual é o seu nome, Cícero?
+#```bach
+
+---
+
+## 2. MapReduce Chain
+
+O *MapReduce chain* é utilizado para processar dados em paralelo, realizando um mapeamento das entradas e depois uma redução para combinar os resultados.
+
+### Exemplo:
+
+```python
+from langchain.chains import MapReduceChain
+from langchain.llms import OpenAI
+
+# Função de mapeamento e redução
+def map_fn(text):
+    return f"Processando: {text}"
+
+def reduce_fn(results):
+    return "\n".join(results)
+
+# Criando a cadeia MapReduce
+chain = MapReduceChain(map_fn=map_fn, reduce_fn=reduce_fn, llm=OpenAI(temperature=0.7))
+
+# Entrada para a cadeia
+output = chain.run(["Entrada 1", "Entrada 2", "Entrada 3"])
+print(output)  # Processando: Entrada 1\nProcessando: Entrada 2\nProcessando: Entrada 3
+#```bach
+
+---
+
+## 3. Agent Chain
+
+O *Agent Chain* envolve agentes que podem tomar decisões dinâmicas com base nas entradas e interagir com ferramentas externas ou dados. Este é um tipo de cadeia flexível e adaptável.
+
+### Exemplo:
+
+```python
+from langchain.agents import initialize_agent
+from langchain.agents import Tool
+from langchain.llms import OpenAI
+from langchain.tools import DuckDuckGoSearchResults
+
+# Definindo a ferramenta de busca
+search = DuckDuckGoSearchResults()
+
+# Definindo o agente
+llm = OpenAI(temperature=0.7)
+tools = [Tool(name="Pesquisa", func=search.run, description="Busca na web")]
+agent = initialize_agent(tools, llm, agent_type="zero-shot-react-description", verbose=True)
+
+# Executando o agente
+output = agent.run("Qual é o melhor filme de 2025?")
+print(output)
+#```bach
+
+---
+
+## 4. LLMChain com Memory
+
+A *memory* no LangChain permite que a cadeia mantenha o estado entre as execuções, o que é útil para interações contínuas, como em chatbots ou assistentes virtuais.
+
+### Exemplo:
+
+```python
+from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
-
-# Cria a memória para armazenar o histórico da conversa
-memory = ConversationBufferMemory()
-
-# Cria a chain com o modelo e a memória
-chain = ConversationChain(llm=chat, memory=memory)
-
-# Envia uma mensagem para iniciar a conversa
-resposta = chain.predict(input="Oi, tudo bem?")
-print(resposta)
-3. 🧩 SequentialChain — Execução em sequência
-Executa várias chains ou funções em ordem, passando o resultado de uma como entrada para a próxima.
-
-bach
-Copiar
-Editar
-from langchain.chains import SequentialChain
+from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 
-# Prompt 1: Gera um nome para um guerreiro medieval
-prompt1 = PromptTemplate.from_template("Crie um nome para um guerreiro medieval.")
-chain1 = LLMChain(llm=chat, prompt=prompt1, output_key="nome")
+# Criando o modelo de linguagem
+llm = OpenAI(temperature=0.7)
 
-# Prompt 2: Cria uma história com base no nome gerado
-prompt2 = PromptTemplate.from_template("Escreva uma história com o guerreiro chamado {nome}.")
-chain2 = LLMChain(llm=chat, prompt=prompt2, output_key="historia")
+# Definindo o prompt
+prompt = PromptTemplate(input_variables=["message"], template="Qual é a sua opinião sobre {message}?")
 
-# Cria a chain sequencial com entrada e saída definidas
-chain = SequentialChain(
-    chains=[chain1, chain2],
-    input_variables=[],
-    output_variables=["historia"],
-    verbose=True
-)
+# Criando a memória de conversação
+memory = ConversationBufferMemory(memory_key="chat_history")
 
-# Executa a chain
-resultado = chain.run()
-print(resultado)
-4. 🔄 SimpleSequentialChain — Versão simplificada
-É uma versão mais simples do SequentialChain, usada quando o output de uma chain deve ir diretamente como input da próxima (sem nomes de variáveis intermediárias).
+# Criando o LLMChain com memória
+chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
 
-bach
-Copiar
-Editar
-from langchain.chains import SimpleSequentialChain
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# Execução da cadeia com entradas e manutenção do estado
+output1 = chain.run(message="tecnologia em IA")
+output2 = chain.run(message="futuro da computação")
+print(output1)
+print(output2)
+#```bach
 
-# Prompt 1: Gera um título
-prompt1 = PromptTemplate.from_template("Gere um título de artigo sobre tecnologia.")
-chain1 = LLMChain(llm=chat, prompt=prompt1)
+---
 
-# Prompt 2: Gera o conteúdo com base no título
-prompt2 = PromptTemplate.from_template("Escreva um parágrafo sobre: {input}")
-chain2 = LLMChain(llm=chat, prompt=prompt2)
+## 5. SQL Chain
 
-# Encadeia as duas chains
-simple_chain = SimpleSequentialChain(chains=[chain1, chain2], verbose=True)
+O *SQL Chain* é usado para consultar bancos de dados SQL diretamente a partir do modelo de linguagem, tornando mais fácil interagir com dados estruturados.
 
-# Executa o fluxo completo
-resultado = simple_chain.run("Inteligência Artificial")
-print(resultado)
-5. 🔍 TransformChain — Pré-processamento ou ajustes
-Executa uma função customizada entre chains, útil para transformar entradas ou saídas. Exemplo básico com manipulação de string:
+### Exemplo:
 
-bach
-Copiar
-Editar
-from langchain.chains import TransformChain
+```python
+from langchain.chains import SQLDatabaseChain
+from langchain.llms import OpenAI
+from langchain.sql_database import SQLDatabase
+import sqlite3
 
-# Função que transforma o texto para maiúsculas
-def transforma_upper(inputs: dict) -> dict:
-    texto = inputs["texto"]
-    return {"texto": texto.upper()}
+# Conexão com banco de dados SQLite
+connection = sqlite3.connect(":memory:")
+cursor = connection.cursor()
+cursor.execute("CREATE TABLE filmes (id INTEGER PRIMARY KEY, nome TEXT)")
+cursor.execute("INSERT INTO filmes (nome) VALUES ('Inception')")
+connection.commit()
 
-# Define a chain de transformação
-transform_chain = TransformChain(
-    input_variables=["texto"],
-    output_variables=["texto"],
-    transform=transforma_upper
-)
+# Criando o banco de dados e o modelo de linguagem
+db = SQLDatabase(connection)
+llm = OpenAI(temperature=0.7)
 
-# Executa a transformação
-print(transform_chain.run({"texto": "olá mundo"}))
-✅ Conclusão
-Chains são essenciais no LangChain para orquestrar interações complexas com modelos de linguagem. Combinando prompts, memória, funções personalizadas e modelos, você pode construir fluxos de trabalho poderosos para:
+# Criando a cadeia SQLDatabaseChain
+chain = SQLDatabaseChain(llm=llm, database=db)
 
-Chatbots com memória
+# Executando uma consulta via cadeia
+output = chain.run("Qual é o nome do filme com o id 1?")
+print(output)  # Saída esperada: Inception
+#```bach
 
-Geração de conteúdo em múltiplas etapas
+---
 
-Agentes que tomam decisões
+## 6. Text Splitter Chain
 
-Automação de tarefas de NLP
+O *Text Splitter Chain* é usado para dividir grandes textos em partes menores, o que é útil quando se lida com textos muito grandes que precisam ser processados em partes.
+
+### Exemplo:
+
+```python
+from langchain.chains import TextSplitterChain
+from langchain.llms import OpenAI
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Criando o modelo de linguagem
+llm = OpenAI(temperature=0.7)
+
+# Criando o splitter de texto
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=100)
+
+# Criando a cadeia de divisão de texto
+chain = TextSplitterChain(llm=llm, text_splitter=text_splitter)
+
+# Entrada para a cadeia
+output = chain.run("Texto longo que precisa ser dividido em partes menores.")
+print(output)  # Saída com as partes do texto divididas
+#```bach
+
+---
+
+## 7. Summarization Chain
+
+O *Summarization Chain* é utilizado para resumir textos longos, condensando as informações mais importantes em um resumo conciso.
+
+### Exemplo:
+
+```python
+from langchain.chains import SummarizationChain
+from langchain.llms import OpenAI
+
+# Criando o modelo de linguagem
+llm = OpenAI(temperature=0.7)
+
+# Criando a cadeia de sumarização
+chain = SummarizationChain(llm=llm)
+
+# Entrada para a cadeia
+output = chain.run("Texto longo que precisa ser resumido.")
+print(output)  # Saída: Resumo do texto
+#```bach
+
+---
+
+Esses são alguns dos tipos principais de *chains* no LangChain, com exemplos e explicações que demonstram sua aplicação prática. Esses fluxos de trabalho oferecem a flexibilidade para combinar diferentes ferramentas, modelos e interações, permitindo a criação de soluções mais sofisticadas e adaptáveis.
